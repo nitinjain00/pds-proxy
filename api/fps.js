@@ -1,13 +1,19 @@
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  const { fpsId, month, year } = req.query;
-  if (!fpsId || !month || !year) return res.status(400).json({ error: 'Missing params' });
+export const config = { runtime: 'edge' };
+
+export default async function handler(req) {
+  const { searchParams } = new URL(req.url);
+  const fpsId = searchParams.get('fpsId');
+  const month = searchParams.get('month');
+  const year  = searchParams.get('year');
+
+  if (!fpsId || !month || !year) {
+    return new Response(JSON.stringify({ error: 'Missing params' }), { status: 400 });
+  }
+
   const govtUrl = `https://smartpds.up.gov.in/Epos_Spring/fps/fpstransaction?fpsId=${fpsId}&month=${month}&year=${year}`;
+
   try {
-    const response = await fetch(govtUrl, {
+    const res = await fetch(govtUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'application/json, text/plain, */*',
@@ -15,10 +21,15 @@ export default async function handler(req, res) {
         'Origin': 'https://smartpds.up.gov.in',
       }
     });
-    if (!response.ok) return res.status(response.status).json({ error: `Govt API error ${response.status}` });
-    const data = await response.json();
-    return res.status(200).json(data);
+    const data = await res.text();
+    return new Response(data, {
+      status: res.status,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      }
+    });
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
